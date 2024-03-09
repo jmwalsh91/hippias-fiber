@@ -4,6 +4,7 @@ import (
 	"os"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/middleware/cors"
 	"github.com/supabase-community/supabase-go"
 )
 
@@ -23,6 +24,10 @@ func New() *Server {
 		App: fiber.New(),
 		sb:  client,
 	}
+	server.App.Use(cors.New(cors.Config{
+		AllowOrigins: "*",
+		AllowHeaders: "Origin, Content-Type, Accept",
+	}))
 
 	server.App.Get("/book/id", server.getBook)
 	server.App.Get("/list", server.listBooks)

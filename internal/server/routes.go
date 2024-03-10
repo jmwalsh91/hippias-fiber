@@ -3,6 +3,7 @@ package server
 import (
 	"encoding/json"
 	"log"
+	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
@@ -15,7 +16,6 @@ func (s *Server) RegisterRoutes() *fiber.App {
 		AllowOrigins: "*",
 		AllowMethods: "GET",
 	}))
-
 	app.Get("/book/id", s.getBook)
 	app.Get("/list", s.listBooks)
 	app.Get("/authors", s.listAuthors)
@@ -25,20 +25,66 @@ func (s *Server) RegisterRoutes() *fiber.App {
 	return app
 }
 
-type Book = struct {
-	Id          int      `json:"id"`
-	Title       string   `json:"title"`
-	Author      string   `json:"author"`
-	Description string   `json:"description"`
-	AuthorId    int      `json:"authorId"`
-	Tags        []string `json:"tags"`
+type User struct {
+	ID        int       `json:"id"`
+	Name      string    `json:"name"`
+	Email     string    `json:"email"`
+	Password  string    `json:"password"`
+	CreatedAt time.Time `json:"createdAt"`
+	UpdatedAt time.Time `json:"updatedAt"`
+}
+
+type Facilitator struct {
+	ID        int       `json:"id"`
+	Name      string    `json:"name"`
+	Email     string    `json:"email"`
+	Bio       string    `json:"bio"`
+	CreatedAt time.Time `json:"createdAt"`
+	UpdatedAt time.Time `json:"updatedAt"`
+}
+
+type Course struct {
+	ID            int       `json:"id"`
+	FacilitatorID int       `json:"facilitatorId"`
+	Title         string    `json:"title"`
+	Description   string    `json:"description"`
+	CreatedAt     time.Time `json:"createdAt"`
+	UpdatedAt     time.Time `json:"updatedAt"`
+}
+
+type Book struct {
+	ID          int       `json:"id"`
+	Title       string    `json:"title"`
+	Author      string    `json:"author"`
+	Description string    `json:"description"`
+	AuthorID    int       `json:"authorId"`
+	CreatedAt   time.Time `json:"createdAt"`
+	UpdatedAt   time.Time `json:"updatedAt"`
 }
 
 type Author struct {
-	ID          int    `json:"id"`
-	Name        string `json:"name"`
-	Nationality string `json:"nationality"`
-	Description string `json:"description"`
+	ID          int       `json:"id"`
+	Name        string    `json:"name"`
+	Nationality string    `json:"nationality"`
+	Description string    `json:"description"`
+	CreatedAt   time.Time `json:"createdAt"`
+	UpdatedAt   time.Time `json:"updatedAt"`
+}
+
+type CourseBook struct {
+	ID        int       `json:"id"`
+	CourseID  int       `json:"courseId"`
+	BookID    int       `json:"bookId"`
+	CreatedAt time.Time `json:"createdAt"`
+	UpdatedAt time.Time `json:"updatedAt"`
+}
+
+type CourseParticipant struct {
+	ID        int       `json:"id"`
+	CourseID  int       `json:"courseId"`
+	UserID    int       `json:"userId"`
+	CreatedAt time.Time `json:"createdAt"`
+	UpdatedAt time.Time `json:"updatedAt"`
 }
 
 func (s *Server) getBook(c *fiber.Ctx) error {

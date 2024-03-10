@@ -21,7 +21,9 @@ func (s *Server) RegisterRoutes() *fiber.App {
 	app.Get("/authors", s.listAuthors)
 	app.Get("/authors/:id", s.getAuthor)
 	app.Get("/books/author/:id", s.getBooksByAuthorID)
-
+	app.Get("/courses", s.listCourses)
+	app.Get("/courses/:id", s.getCourse)
+	app.Post("/courses", s.createCourse)
 	return app
 }
 
@@ -188,9 +190,7 @@ func (s *Server) listBooks(c *fiber.Ctx) error {
 }
 
 /*
-*
-
-	 ____
+*	 ____
 	/ ___|___  _   _ _ __ ___  ___  ___
     | |   / _ \| | | | '__/ __|/ _ \/ __|
 	| |__| (_) | |_| | |  \__ \  __/\__ \
@@ -247,12 +247,12 @@ func (s *Server) createCourse(c *fiber.Ctx) error {
 		return c.SendStatus(fiber.StatusInternalServerError)
 	}
 
-	_, err = s.sb.From("courses").Insert(string(data)).Execute()
+	data, _, err = s.sb.From("courses").Insert(string(data), false, "Error", "Success", "1").Execute()
 	if err != nil {
 		log.Printf("Error inserting course: %v", err)
 		return c.SendStatus(fiber.StatusInternalServerError)
 	}
 
 	log.Printf("Created course: %+v", course)
-	return c.JSON(course)
+	return c.JSON(data)
 }

@@ -34,6 +34,9 @@ func New() *Server {
 	server.App.Get("/authors", server.listAuthors)
 	server.App.Get("/authors/:id", server.getAuthor)
 	server.App.Get("/books/author/:id", server.getBooksByAuthorID)
+	server.App.Get("/courses", server.listCourses)
+	server.App.Get("/courses/:id", server.getCourse)
+	server.App.Post("/courses", server.createCourse)
 
 	return server
 }

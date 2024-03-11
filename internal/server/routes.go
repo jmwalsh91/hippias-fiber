@@ -24,6 +24,10 @@ func (s *Server) RegisterRoutes() *fiber.App {
 	app.Get("/courses", s.listCourses)
 	app.Get("/courses/:id", s.getCourse)
 	app.Post("/courses", s.createCourse)
+	app.Get("/facilitators", s.listFacilitators)
+	app.Get("/facilitators/:id", s.getFacilitator)
+	app.Post("/facilitators", s.createFacilitator)
+	app.Delete("/facilitators/:id", s.deleteFacilitator)
 	return app
 }
 

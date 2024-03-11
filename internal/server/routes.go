@@ -135,6 +135,17 @@ func (s *Server) getBooksByAuthorID(c *fiber.Ctx) error {
 	return c.JSON(books)
 }
 
+/*
+*
+
+		_         _   _
+	   / \  _   _| |_| |__   ___  _ __
+	  / _ \| | | | __| '_ \ / _ \| '__|
+	 / ___ \ |_| | |_| | | | (_) | |
+	/_/   \_\__,_|\__|_| |_|\___/|_|
+
+*
+*/
 func (s *Server) listAuthors(c *fiber.Ctx) error {
 	data, _, err := s.sb.From("authors").Select("*", "exact", false).Execute()
 	if err != nil {
@@ -170,6 +181,17 @@ func (s *Server) getAuthor(c *fiber.Ctx) error {
 	return c.JSON(author)
 }
 
+/*
+*
+__
+
+	     ____              _
+		| __ )  ___   ___ | | __
+		|  _ \ / _ \ / _ \| |/ /
+		| |_) | (_) | (_) |   <
+		|____/ \___/ \___/|_|\_\
+		*
+*/
 func (s *Server) listBooks(c *fiber.Ctx) error {
 	data, _, err := s.sb.From("books").Select("*", "exact", false).Execute()
 
@@ -256,3 +278,85 @@ func (s *Server) createCourse(c *fiber.Ctx) error {
 	log.Printf("Created course: %+v", course)
 	return c.JSON(data)
 }
+
+/**
+_____           _ _ _ _        _
+ |  ___|_ _  ___(_) (_) |_ __ _| |_ ___  _ __
+ | |_ / _` |/ __| | | | __/ _` | __/ _ \| '__|
+ |  _| (_| | (__| | | | || (_| | || (_) | |
+ |_|  \__,_|\___|_|_|_|\__\__,_|\__\___/|_|
+**/
+
+func (s *Server) listFacilitators(c *fiber.Ctx) error {
+	data, _, err := s.sb.From("facilitators").Select("*", "exact", true).Execute()
+	if err != nil {
+		log.Printf("Error querying facilitators: %v", err)
+		return c.SendStatus(fiber.StatusInternalServerError)
+	}
+
+	var facilitators []Facilitator
+	if err := json.Unmarshal(data, &facilitators); err != nil {
+		log.Printf("Error unmarshaling facilitators: %v", err)
+		return c.SendStatus(fiber.StatusInternalServerError)
+	}
+
+	log.Printf("Facilitators: %+v", facilitators)
+	return c.JSON(facilitators)
+}
+
+func (s *Server) getFacilitator(c *fiber.Ctx) error {
+	facilitatorID := c.Params("id")
+
+	data, _, err := s.sb.From("facilitators").Select("*", "exact", true).Eq("id", facilitatorID).Execute()
+	if err != nil {
+		log.Printf("Error querying facilitator: %v", err)
+		return c.SendStatus(fiber.StatusInternalServerError)
+	}
+
+	var facilitator Facilitator
+	if err := json.Unmarshal(data, &facilitator); err != nil {
+		log.Printf("Error unmarshaling facilitator: %v", err)
+		return c.SendStatus(fiber.StatusInternalServerError)
+	}
+
+	log.Printf("Facilitator: %+v", facilitator)
+	return c.JSON(facilitator)
+}
+
+func (s *Server) createFacilitator(c *fiber.Ctx) error {
+	var facilitator Facilitator
+	if err := c.BodyParser(&facilitator); err != nil {
+		log.Printf("Error parsing facilitator: %v", err)
+		return c.SendStatus(fiber.StatusBadRequest)
+	}
+
+	data, _, err := s.sb.From("facilitators").Insert(facilitator, false, "", "*", "").Execute()
+	if err != nil {
+		log.Printf("Error inserting facilitator: %v", err)
+		return c.SendStatus(fiber.StatusInternalServerError)
+	}
+
+	log.Printf("Created facilitator: %+v", facilitator, data)
+	return c.JSON(facilitator)
+}
+
+func (s *Server) deleteFacilitator(c *fiber.Ctx) error {
+	facilitatorID := c.Params("id")
+
+	data, _, err := s.sb.From("facilitators").Delete("Success", "true").Eq("id", facilitatorID).Execute()
+	if err != nil {
+		log.Printf("Error deleting facilitator: %v", err)
+		return c.SendStatus(fiber.StatusInternalServerError)
+	}
+
+	log.Printf("Deleted facilitator with ID: %s", facilitatorID, data)
+	return c.SendStatus(fiber.StatusNoContent)
+}
+
+/**
+____                          ____              _
+  / ___|___  _   _ _ __ ___  ___|  _ \  ___   ___ | | __
+ | |   / _ \| | | | '__/ __|/ _ \ | | |/ _ \ / _ \| |/ /
+ | |__| (_) | |_| | |  \__ \  __/ |_| | (_) | (_) |   <
+  \____\___/ \__,_|_|  |___/\___|____/ \___/ \___/|_|\_\
+  **/

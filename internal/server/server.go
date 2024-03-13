@@ -10,7 +10,7 @@ import (
 
 type Server struct {
 	*fiber.App
-	sb *supabase.Client
+	Sb *supabase.Client
 }
 
 func New() *Server {
@@ -22,21 +22,12 @@ func New() *Server {
 	}
 	server := &Server{
 		App: fiber.New(),
-		sb:  client,
+		Sb:  client,
 	}
 	server.App.Use(cors.New(cors.Config{
 		AllowOrigins: "*",
 		AllowHeaders: "Origin, Content-Type, Accept",
 	}))
-
-	server.App.Get("/book/id", server.getBook)
-	server.App.Get("/list", server.listBooks)
-	server.App.Get("/authors", server.listAuthors)
-	server.App.Get("/authors/:id", server.getAuthor)
-	server.App.Get("/books/author/:id", server.getBooksByAuthorID)
-	server.App.Get("/courses", server.listCourses)
-	server.App.Get("/courses/:id", server.getCourse)
-	server.App.Post("/courses", server.createCourse)
 
 	return server
 }

@@ -3,7 +3,6 @@ package server
 import (
 	"encoding/json"
 	"log"
-	"time"
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
@@ -31,72 +30,10 @@ func (s *Server) RegisterRoutes() *fiber.App {
 	return app
 }
 
-type User struct {
-	ID        int       `json:"id"`
-	Name      string    `json:"name"`
-	Email     string    `json:"email"`
-	Password  string    `json:"password"`
-	CreatedAt time.Time `json:"createdAt"`
-	UpdatedAt time.Time `json:"updatedAt"`
-}
-
-type Facilitator struct {
-	ID        int       `json:"id"`
-	Name      string    `json:"name"`
-	Email     string    `json:"email"`
-	Bio       string    `json:"bio"`
-	CreatedAt time.Time `json:"createdAt"`
-	UpdatedAt time.Time `json:"updatedAt"`
-}
-
-type Course struct {
-	ID            int       `json:"id"`
-	FacilitatorID int       `json:"facilitatorId"`
-	Title         string    `json:"title"`
-	Description   string    `json:"description"`
-	CreatedAt     time.Time `json:"createdAt"`
-	UpdatedAt     time.Time `json:"updatedAt"`
-}
-
-type Book struct {
-	ID          int       `json:"id"`
-	Title       string    `json:"title"`
-	Author      string    `json:"author"`
-	Description string    `json:"description"`
-	AuthorID    int       `json:"authorId"`
-	CreatedAt   time.Time `json:"createdAt"`
-	UpdatedAt   time.Time `json:"updatedAt"`
-}
-
-type Author struct {
-	ID          int       `json:"id"`
-	Name        string    `json:"name"`
-	Nationality string    `json:"nationality"`
-	Description string    `json:"description"`
-	CreatedAt   time.Time `json:"createdAt"`
-	UpdatedAt   time.Time `json:"updatedAt"`
-}
-
-type CourseBook struct {
-	ID        int       `json:"id"`
-	CourseID  int       `json:"courseId"`
-	BookID    int       `json:"bookId"`
-	CreatedAt time.Time `json:"createdAt"`
-	UpdatedAt time.Time `json:"updatedAt"`
-}
-
-type CourseParticipant struct {
-	ID        int       `json:"id"`
-	CourseID  int       `json:"courseId"`
-	UserID    int       `json:"userId"`
-	CreatedAt time.Time `json:"createdAt"`
-	UpdatedAt time.Time `json:"updatedAt"`
-}
-
 func (s *Server) getBook(c *fiber.Ctx) error {
 	bookID := c.Params("id")
 
-	data, _, err := s.sb.From("books").
+	data, _, err := s.Sb.From("books").
 		Select("*", "1", false).
 		Eq("id", bookID).
 		Single().
@@ -122,7 +59,7 @@ func (s *Server) getBooksByAuthorID(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).SendString("Missing author ID")
 	}
 
-	data, _, err := s.sb.From("books").
+	data, _, err := s.Sb.From("books").
 		Select("*", "exact", false).
 		Eq("authorId", authorID).
 		Execute()
@@ -151,7 +88,7 @@ func (s *Server) getBooksByAuthorID(c *fiber.Ctx) error {
 *
 */
 func (s *Server) listAuthors(c *fiber.Ctx) error {
-	data, _, err := s.sb.From("authors").Select("*", "exact", false).Execute()
+	data, _, err := s.Sb.From("authors").Select("*", "exact", false).Execute()
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).SendString(err.Error())
 	}
@@ -167,7 +104,7 @@ func (s *Server) listAuthors(c *fiber.Ctx) error {
 func (s *Server) getAuthor(c *fiber.Ctx) error {
 	authorID := c.Params("id")
 	log.Printf("Author ID: %v", authorID)
-	data, _, err := s.sb.From("authors").
+	data, _, err := s.Sb.From("authors").
 		Select("*", "exact", false).
 		Eq("id", authorID).
 		Single().
@@ -197,7 +134,7 @@ __
 		*
 */
 func (s *Server) listBooks(c *fiber.Ctx) error {
-	data, _, err := s.sb.From("books").Select("*", "exact", false).Execute()
+	data, _, err := s.Sb.From("books").Select("*", "exact", false).Execute()
 
 	if err != nil {
 		log.Printf("Error querying books: %v", err)
@@ -225,7 +162,7 @@ func (s *Server) listBooks(c *fiber.Ctx) error {
 */
 
 func (s *Server) listCourses(c *fiber.Ctx) error {
-	data, _, err := s.sb.From("courses").Select("*", "exact", false).Execute()
+	data, _, err := s.Sb.From("courses").Select("*", "exact", false).Execute()
 	if err != nil {
 		log.Printf("Error querying courses: %v", err)
 		return c.SendStatus(fiber.StatusInternalServerError)
@@ -244,7 +181,7 @@ func (s *Server) listCourses(c *fiber.Ctx) error {
 func (s *Server) getCourse(c *fiber.Ctx) error {
 	courseID := c.Params("id")
 
-	data, _, err := s.sb.From("courses").Select("*", "exact", false).Eq("id", courseID).Execute()
+	data, _, err := s.Sb.From("courses").Select("*", "exact", false).Eq("id", courseID).Execute()
 	if err != nil {
 		log.Printf("Error querying course: %v", err)
 		return c.SendStatus(fiber.StatusInternalServerError)
@@ -273,7 +210,7 @@ func (s *Server) createCourse(c *fiber.Ctx) error {
 		return c.SendStatus(fiber.StatusInternalServerError)
 	}
 
-	data, _, err = s.sb.From("courses").Insert(string(data), false, "Error", "Success", "1").Execute()
+	data, _, err = s.Sb.From("courses").Insert(string(data), false, "Error", "Success", "1").Execute()
 	if err != nil {
 		log.Printf("Error inserting course: %v", err)
 		return c.SendStatus(fiber.StatusInternalServerError)
@@ -292,7 +229,7 @@ _____           _ _ _ _        _
 **/
 
 func (s *Server) listFacilitators(c *fiber.Ctx) error {
-	data, _, err := s.sb.From("facilitators").Select("*", "exact", true).Execute()
+	data, _, err := s.Sb.From("facilitators").Select("*", "exact", true).Execute()
 	if err != nil {
 		log.Printf("Error querying facilitators: %v", err)
 		return c.SendStatus(fiber.StatusInternalServerError)
@@ -311,7 +248,7 @@ func (s *Server) listFacilitators(c *fiber.Ctx) error {
 func (s *Server) getFacilitator(c *fiber.Ctx) error {
 	facilitatorID := c.Params("id")
 
-	data, _, err := s.sb.From("facilitators").Select("*", "exact", true).Eq("id", facilitatorID).Execute()
+	data, _, err := s.Sb.From("facilitators").Select("*", "exact", true).Eq("id", facilitatorID).Execute()
 	if err != nil {
 		log.Printf("Error querying facilitator: %v", err)
 		return c.SendStatus(fiber.StatusInternalServerError)
@@ -334,7 +271,7 @@ func (s *Server) createFacilitator(c *fiber.Ctx) error {
 		return c.SendStatus(fiber.StatusBadRequest)
 	}
 
-	data, _, err := s.sb.From("facilitators").Insert(facilitator, false, "", "*", "").Execute()
+	data, _, err := s.Sb.From("facilitators").Insert(facilitator, false, "", "*", "").Execute()
 	if err != nil {
 		log.Printf("Error inserting facilitator: %v", err)
 		return c.SendStatus(fiber.StatusInternalServerError)
@@ -347,7 +284,7 @@ func (s *Server) createFacilitator(c *fiber.Ctx) error {
 func (s *Server) deleteFacilitator(c *fiber.Ctx) error {
 	facilitatorID := c.Params("id")
 
-	data, _, err := s.sb.From("facilitators").Delete("Success", "true").Eq("id", facilitatorID).Execute()
+	data, _, err := s.Sb.From("facilitators").Delete("Success", "true").Eq("id", facilitatorID).Execute()
 	if err != nil {
 		log.Printf("Error deleting facilitator: %v", err)
 		return c.SendStatus(fiber.StatusInternalServerError)

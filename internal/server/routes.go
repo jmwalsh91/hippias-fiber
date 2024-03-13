@@ -4,122 +4,48 @@ import (
 	"encoding/json"
 	"log"
 
+	"hippias-fiber/internal/handlers"
+
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
 )
 
 func (s *Server) RegisterRoutes() *fiber.App {
 	app := fiber.New()
-
 	app.Use(cors.New(cors.Config{
 		AllowOrigins: "*",
-		AllowMethods: "GET",
+		AllowMethods: "GET, POST, DELETE",
 	}))
-	app.Get("/book/id", s.getBook)
-	app.Get("/list", s.listBooks)
-	app.Get("/authors", s.listAuthors)
-	app.Get("/authors/:id", s.getAuthor)
-	app.Get("/books/author/:id", s.getBooksByAuthorID)
-	app.Get("/courses", s.listCourses)
-	app.Get("/courses/:id", s.getCourse)
-	app.Post("/courses", s.createCourse)
-	app.Get("/facilitators", s.listFacilitators)
-	app.Get("/facilitators/:id", s.getFacilitator)
-	app.Post("/facilitators", s.createFacilitator)
-	app.Delete("/facilitators/:id", s.deleteFacilitator)
+
+	// Book routes
+	app.Get("/books/:id", handlers.GetBook(s))
+	app.Get("/books", handlers.ListBooks(s))
+	app.Get("/books/author/:id", handlers.GetBooksByAuthorID(s))
+
+	// Author routes
+	app.Get("/authors", handlers.ListAuthors(s))
+	app.Get("/authors/:id", handlers.GetAuthor(s))
+	app.Post("/authors", handlers.CreateAuthor(s))
+	app.Delete("/authors/:id", handlers.DeleteAuthor(s))
+
+	// Course routes
+	app.Get("/courses", handlers.ListCourses(s))
+	app.Get("/courses/:id", handlers.GetCourse(s))
+	app.Post("/courses", handlers.CreateCourse(s))
+
+	// Facilitator routes
+	app.Get("/facilitators", handlers.ListFacilitators(s))
+	app.Get("/facilitators/:id", handlers.GetFacilitator(s))
+	app.Post("/facilitators", handlers.CreateFacilitator(s))
+	app.Delete("/facilitators/:id", handlers.DeleteFacilitator(s))
+
+	// CourseParticipant routes
+	app.Get("/course-participants", handlers.ListCourseParticipants(s))
+	app.Get("/course-participants/:courseId/:userId", handlers.GetCourseParticipant(s))
+	app.Post("/course-participants", handlers.CreateCourseParticipant(s))
+	app.Delete("/course-participants/:courseId/:userId", handlers.DeleteCourseParticipant(s))
+
 	return app
-}
-
-func (s *Server) getBook(c *fiber.Ctx) error {
-	bookID := c.Params("id")
-
-	data, _, err := s.Sb.From("books").
-		Select("*", "1", false).
-		Eq("id", bookID).
-		Single().
-		Execute()
-
-	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).SendString(err.Error())
-	}
-
-	var book Book
-	if err := json.Unmarshal(data, &book); err != nil {
-		return c.Status(fiber.StatusInternalServerError).SendString(err.Error())
-	}
-
-	return c.JSON(book)
-}
-
-func (s *Server) getBooksByAuthorID(c *fiber.Ctx) error {
-	authorID := c.Params("id")
-	log.Printf("Author ID: %v", authorID)
-
-	if authorID == "" {
-		return c.Status(fiber.StatusBadRequest).SendString("Missing author ID")
-	}
-
-	data, _, err := s.Sb.From("books").
-		Select("*", "exact", false).
-		Eq("authorId", authorID).
-		Execute()
-	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).SendString(err.Error())
-	}
-
-	var books []Book
-	if err := json.Unmarshal(data, &books); err != nil {
-		return c.Status(fiber.StatusInternalServerError).SendString(err.Error())
-	}
-	log.Printf("Books: %v", books)
-
-	return c.JSON(books)
-}
-
-/*
-*
-
-		_         _   _
-	   / \  _   _| |_| |__   ___  _ __
-	  / _ \| | | | __| '_ \ / _ \| '__|
-	 / ___ \ |_| | |_| | | | (_) | |
-	/_/   \_\__,_|\__|_| |_|\___/|_|
-
-*
-*/
-func (s *Server) listAuthors(c *fiber.Ctx) error {
-	data, _, err := s.Sb.From("authors").Select("*", "exact", false).Execute()
-	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).SendString(err.Error())
-	}
-
-	var authors []Author
-	if err := json.Unmarshal(data, &authors); err != nil {
-		return c.Status(fiber.StatusInternalServerError).SendString(err.Error())
-	}
-
-	return c.JSON(authors)
-}
-
-func (s *Server) getAuthor(c *fiber.Ctx) error {
-	authorID := c.Params("id")
-	log.Printf("Author ID: %v", authorID)
-	data, _, err := s.Sb.From("authors").
-		Select("*", "exact", false).
-		Eq("id", authorID).
-		Single().
-		Execute()
-
-	if err != nil {
-		return c.Status(fiber.StatusInternalServerError).SendString(err.Error())
-	}
-
-	var author Author
-	if err := json.Unmarshal(data, &author); err != nil {
-		return c.Status(fiber.StatusInternalServerError).SendString(err.Error())
-	}
-
-	return c.JSON(author)
 }
 
 /*
@@ -133,7 +59,7 @@ __
 		|____/ \___/ \___/|_|\_\
 		*
 */
-func (s *Server) listBooks(c *fiber.Ctx) error {
+/* func (s *Server) listBooks(c *fiber.Ctx) error {
 	data, _, err := s.Sb.From("books").Select("*", "exact", false).Execute()
 
 	if err != nil {
@@ -151,7 +77,7 @@ func (s *Server) listBooks(c *fiber.Ctx) error {
 
 	return c.JSON(books)
 }
-
+*/
 /*
 *	 ____
 	/ ___|___  _   _ _ __ ___  ___  ___

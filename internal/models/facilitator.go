@@ -9,4 +9,5 @@ type Facilitator struct {
 	Bio       string    `json:"bio"`
 	CreatedAt time.Time `json:"createdAt"`
 	UpdatedAt time.Time `json:"updatedAt"`
+	PhotoUrl  string    `json:"photo_url"`
 }

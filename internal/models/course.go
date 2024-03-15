@@ -9,4 +9,5 @@ type Course struct {
 	Description   string    `json:"description"`
 	CreatedAt     time.Time `json:"createdAt"`
 	UpdatedAt     time.Time `json:"updatedAt"`
+	PhotoUrl      string    `json:"photo_url"`
 }

@@ -1,11 +1,9 @@
 package models
 
-import "time"
-
 type CourseBook struct {
-	ID        int       `json:"id"`
-	CourseID  int       `json:"courseId"`
-	BookID    int       `json:"bookId"`
-	CreatedAt time.Time `json:"createdAt"`
-	UpdatedAt time.Time `json:"updatedAt"`
+	ID        int    `json:"id"`
+	CourseID  int    `json:"course_id"`
+	BookID    int    `json:"book_id"`
+	CreatedAt string `json:"created_at"`
+	UpdatedAt string `json:"updated_at"`
 }

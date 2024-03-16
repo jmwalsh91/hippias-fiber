@@ -2,6 +2,7 @@ package server
 
 import (
 	"encoding/json"
+	"fmt"
 	"hippias-fiber/internal/models"
 	_ "hippias-fiber/swagger"
 	"log"
@@ -283,6 +284,7 @@ func (s *Server) getCourse(c *fiber.Ctx) error {
 // @Router /courses/details/{id} [get]
 func (s *Server) GetCourseWithDetails(c *fiber.Ctx) error {
 	courseID := c.Params("id")
+	log.Printf("GetCourseWithDetails: Processing request for course ID: %s", courseID)
 
 	courseData, _, err := s.Sb().From("courses").
 		Select("*", "exact", false).
@@ -290,75 +292,92 @@ func (s *Server) GetCourseWithDetails(c *fiber.Ctx) error {
 		Single().
 		Execute()
 	if err != nil {
-		log.Printf("Error querying course: %v", err)
+		log.Printf("GetCourseWithDetails: Error querying course: %v", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{Message: err.Error()})
 	}
 
 	var course models.Course
 	if err := json.Unmarshal(courseData, &course); err != nil {
-		log.Printf("Error unmarshaling course: %v", err)
+		log.Printf("GetCourseWithDetails: Error unmarshaling course data: %v", err)
+		log.Printf("GetCourseWithDetails: Course data: %s", string(courseData))
 		return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{Message: err.Error()})
 	}
+	log.Printf("GetCourseWithDetails: Fetched course: %+v", course)
 
-	facIdStr := strconv.Itoa(course.FacilitatorID)
+	if err != nil {
+		log.Printf("GetCourseWithDetails: Error parsing created_at: %v", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{Message: fmt.Sprintf("Error parsing created_at: %v", err)})
+	}
+	if err != nil {
+		log.Printf("GetCourseWithDetails: Error parsing updated_at: %v", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{Message: fmt.Sprintf("Error parsing updated_at: %v", err)})
+	}
+
+	if course.FacilitatorID == 0 {
+		log.Printf("GetCourseWithDetails: Invalid Facilitator ID for course ID: %s", courseID)
+		return c.Status(fiber.StatusNotFound).JSON(ErrorResponse{Message: "Facilitator not found"})
+	}
+
+	facId := strconv.Itoa(course.FacilitatorID)
 	facilitatorData, _, err := s.Sb().From("facilitators").
 		Select("*", "exact", false).
-		Eq("id", facIdStr).
+		Eq("id", facId).
+		Single().
 		Execute()
 	if err != nil {
-		log.Printf("Error querying facilitator: %v", err, facilitatorData)
+		log.Printf("GetCourseWithDetails: Error querying facilitator: %v", err)
+		log.Printf("GetCourseWithDetails: Facilitator ID: %d", course.FacilitatorID)
 		return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{Message: err.Error()})
 	}
 
-	var facilitators []models.Facilitator
-	if err := json.Unmarshal(facilitatorData, &facilitators); err != nil {
-		log.Printf("Error unmarshaling facilitators: %v", err)
+	var facilitator models.Facilitator
+	if err := json.Unmarshal(facilitatorData, &facilitator); err != nil {
+		log.Printf("GetCourseWithDetails: Error unmarshaling facilitator data: %v", err)
+		log.Printf("GetCourseWithDetails: Facilitator data: %s", string(facilitatorData))
 		return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{Message: err.Error()})
 	}
-
-	if len(facilitators) == 0 {
-		log.Printf("Facilitator not found for course %s", courseID)
-		return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{Message: "Facilitator not found"})
-	} else if len(facilitators) > 1 {
-		log.Printf("Multiple facilitators found for course %s", courseID)
-		return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{Message: "Multiple facilitators found"})
-	}
-
-	facilitator := facilitators[0]
+	log.Printf("GetCourseWithDetails: Fetched facilitator: %+v", facilitator)
 
 	booksData, _, err := s.Sb().From("course_books").
 		Select("book_id", "exact", false).
 		Eq("course_id", courseID).
 		Execute()
 	if err != nil {
-		log.Printf("Error querying course books: %v", err)
+		log.Printf("GetCourseWithDetails: Error querying course books: %v", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{Message: err.Error()})
 	}
 
 	var courseBooks []models.CourseBook
 	if err := json.Unmarshal(booksData, &courseBooks); err != nil {
-		log.Printf("Error unmarshaling course books: %v", err)
+		log.Printf("GetCourseWithDetails: Error unmarshaling course books data: %v", err)
+		log.Printf("GetCourseWithDetails: Course books data: %s", string(booksData))
 		return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{Message: err.Error()})
 	}
+	log.Printf("GetCourseWithDetails: Fetched course books: %+v", courseBooks)
 
 	var books []models.Book
 	for _, courseBook := range courseBooks {
-		var bId = strconv.Itoa(courseBook.BookID)
+		bookID := strconv.Itoa(courseBook.BookID)
+		log.Printf("GetCourseWithDetails: Processing book ID: %s", bookID)
+
 		bookData, _, err := s.Sb().From("books").
 			Select("*", "exact", false).
-			Eq("id", bId).
+			Eq("id", bookID).
 			Single().
 			Execute()
 		if err != nil {
-			log.Printf("Error querying book: %v", err)
+			log.Printf("GetCourseWithDetails: Error querying book: %v", err)
+			log.Printf("GetCourseWithDetails: Book ID: %s", bookID)
 			return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{Message: err.Error()})
 		}
 
 		var book models.Book
 		if err := json.Unmarshal(bookData, &book); err != nil {
-			log.Printf("Error unmarshaling book: %v", err)
+			log.Printf("GetCourseWithDetails: Error unmarshaling book data: %v", err)
+			log.Printf("GetCourseWithDetails: Book data: %s", string(bookData))
 			return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{Message: err.Error()})
 		}
+		log.Printf("GetCourseWithDetails: Fetched book: %+v", book)
 
 		books = append(books, book)
 	}
@@ -368,6 +387,7 @@ func (s *Server) GetCourseWithDetails(c *fiber.Ctx) error {
 		Facilitator: facilitator,
 		Books:       books,
 	}
+	log.Printf("GetCourseWithDetails: Response: %+v", response)
 
 	return c.JSON(response)
 }

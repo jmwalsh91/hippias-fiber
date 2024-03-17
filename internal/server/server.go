@@ -86,7 +86,11 @@ func (s *Server) setupRoutes() {
 	s.App.Post("/discussions", s.createDiscussion)
 	s.App.Put("/discussions/:id", s.updateDiscussion)
 	s.App.Delete("/discussions/:id", s.deleteDiscussion)
-
+	s.App.Get("/readings", s.listReadings)
+	s.App.Get("/readings/:id", s.getReading)
+	s.App.Post("/readings", s.createReading)
+	s.App.Put("/readings/:id", s.updateReading)
+	s.App.Delete("/readings/:id", s.deleteReading)
 }
 
 func (s *Server) login(c *fiber.Ctx) error {
@@ -615,3 +619,113 @@ func (s *Server) deleteDiscussion(c *fiber.Ctx) error {
 }
 
 //Readings!
+
+func (s *Server) createReading(c *fiber.Ctx) error {
+	var reading models.Reading
+	if err := c.BodyParser(&reading); err != nil {
+		log.Printf("Error parsing reading: %v", err)
+		return c.Status(fiber.StatusBadRequest).JSON(ErrorResponse{Message: err.Error()})
+	}
+
+	data, err := json.Marshal(reading)
+	if err != nil {
+		log.Printf("Error marshaling reading: %v", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{Message: err.Error()})
+	}
+
+	var jsonResult json.RawMessage
+	err = s.sb.DB.From("readings").Insert(string(data)).Execute(&jsonResult)
+	if err != nil {
+		log.Printf("Error inserting reading: %v", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{Message: err.Error()})
+	}
+
+	log.Printf("Created reading: %+v", reading)
+	return c.JSON(reading)
+}
+
+func (s *Server) getReading(c *fiber.Ctx) error {
+	readingID := c.Params("id")
+
+	var jsonResult json.RawMessage
+	err := s.sb.DB.From("readings").
+		Select("*").
+		Single().
+		Eq("id", readingID).
+		Execute(&jsonResult)
+	if err != nil {
+		log.Printf("Error querying reading: %v", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{Message: err.Error()})
+	}
+
+	var reading models.Reading
+	err = json.Unmarshal(jsonResult, &reading)
+	if err != nil {
+		log.Printf("Error unmarshaling reading: %v", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{Message: err.Error()})
+	}
+
+	log.Printf("Reading: %+v", reading)
+	return c.JSON(reading)
+}
+
+func (s *Server) listReadings(c *fiber.Ctx) error {
+	var jsonResult json.RawMessage
+	err := s.sb.DB.From("readings").Select("*").Execute(&jsonResult)
+	if err != nil {
+		log.Printf("Error querying readings: %v", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{Message: err.Error()})
+	}
+
+	var readings []models.Reading
+	err = json.Unmarshal(jsonResult, &readings)
+	if err != nil {
+		log.Printf("Error unmarshaling readings: %v", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{Message: err.Error()})
+	}
+
+	log.Printf("Readings: %+v", readings)
+	return c.JSON(readings)
+}
+
+func (s *Server) updateReading(c *fiber.Ctx) error {
+	readingID := c.Params("id")
+
+	var reading models.Reading
+	if err := c.BodyParser(&reading); err != nil {
+		log.Printf("Error parsing reading: %v", err)
+		return c.Status(fiber.StatusBadRequest).JSON(ErrorResponse{Message: err.Error()})
+	}
+
+	data, err := json.Marshal(reading)
+	if err != nil {
+		log.Printf("Error marshaling reading: %v", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{Message: err.Error()})
+	}
+
+	var jsonResult json.RawMessage
+	err = s.sb.DB.From("readings").Update(string(data)).Eq("id", readingID).Execute(&jsonResult)
+	if err != nil {
+		log.Printf("Error updating reading: %v", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{Message: err.Error()})
+	}
+
+	log.Printf("Updated reading: %+v", reading)
+	return c.JSON(reading)
+}
+
+func (s *Server) deleteReading(c *fiber.Ctx) error {
+	readingID := c.Params("id")
+
+	var jsonResult json.RawMessage
+	err := s.sb.DB.From("readings").Delete().Eq("id", readingID).Execute(&jsonResult)
+	if err != nil {
+		log.Printf("Error deleting reading: %v", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{Message: err.Error()})
+	}
+
+	log.Printf("Deleted reading with ID: %s", readingID)
+	return c.SendStatus(fiber.StatusNoContent)
+}
+
+//

@@ -21,6 +21,19 @@ type Server struct {
 	sb *supa.Client
 }
 
+func getDecoder() *mapstructure.Decoder {
+	config := &mapstructure.DecoderConfig{
+		TagName: "json",
+		Squash:  false,
+		Result:  &map[string]interface{}{},
+	}
+	decoder, err := mapstructure.NewDecoder(config)
+	if err != nil {
+		log.Fatalf("Error creating decoder: %v", err)
+	}
+	return decoder
+}
+
 func New() *Server {
 	API_KEY := os.Getenv("API_KEY")
 	API_URL := os.Getenv("API_URL")
@@ -65,8 +78,58 @@ func (s *Server) setupRoutes() {
 	s.App.Get("/facilitators/:id", s.getFacilitator)
 	s.App.Post("/facilitators", s.createFacilitator)
 	s.App.Delete("/facilitators/:id", s.deleteFacilitator)
+	s.App.Post("/login", s.login)
+	s.App.Post("/register", s.register)
+	s.App.Post("/logout", s.logout)
 }
 
+func (s *Server) login(c *fiber.Ctx) error {
+	var body struct {
+		Email    string `json:"email"`
+		Password string `json:"password"`
+	}
+	if err := c.BodyParser(&body); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(ErrorResponse{Message: err.Error()})
+	}
+
+	user, err := s.sb.Auth.SignIn(c.Context(), supa.UserCredentials{
+		Email:    body.Email,
+		Password: body.Password,
+	})
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{Message: err.Error()})
+	}
+	log.Printf("User: %+v", user)
+	return c.JSON(map[string]string{"message": "Login successful"})
+}
+
+func (s *Server) logout(c *fiber.Ctx) error {
+	token := c.Get("Authorization")
+	err := s.sb.Auth.SignOut(c.Context(), token)
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{Message: err.Error()})
+	}
+	return c.JSON(map[string]string{"message": "Logout successful"})
+}
+
+func (s *Server) register(c *fiber.Ctx) error {
+	var body struct {
+		Email    string `json:"email"`
+		Password string `json:"password"`
+	}
+	if err := c.BodyParser(&body); err != nil {
+		return c.Status(fiber.StatusBadRequest).JSON(ErrorResponse{Message: err.Error()})
+	}
+	user, err := s.sb.Auth.SignUp(c.Context(), supa.UserCredentials{
+		Email:    body.Email,
+		Password: body.Password,
+	})
+	if err != nil {
+		return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{Message: err.Error()})
+	}
+	log.Printf("User: %+v", user)
+	return c.JSON(map[string]string{"message": "Registration successful"})
+}
 func (s *Server) getBook(c *fiber.Ctx) error {
 	bookID := c.Params("id")
 
@@ -99,7 +162,7 @@ func (s *Server) getBooksByAuthorID(c *fiber.Ctx) error {
 
 	var result map[string]interface{}
 	err := s.sb.DB.From("books").
-		Select("*", "exact").
+		Select("*").
 		Eq("authorId", authorID).
 		Execute(&result)
 
@@ -107,6 +170,7 @@ func (s *Server) getBooksByAuthorID(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{Message: err.Error()})
 	}
 
+	log.Printf("Result: %v", result)
 	var books []models.Book
 	if err := mapstructure.Decode(result, &books); err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{Message: err.Error()})
@@ -118,7 +182,7 @@ func (s *Server) getBooksByAuthorID(c *fiber.Ctx) error {
 
 func (s *Server) listAuthors(c *fiber.Ctx) error {
 	var results []map[string]interface{}
-	err := s.sb.DB.From("authors").Select("*", "exact").Execute(&results)
+	err := s.sb.DB.From("authors").Select("*").Execute(&results)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{Message: err.Error()})
 	}
@@ -136,7 +200,7 @@ func (s *Server) getAuthor(c *fiber.Ctx) error {
 	log.Printf("Author ID: %v", authorID)
 	var result map[string]interface{}
 	err := s.sb.DB.From("authors").
-		Select("*", "exact").
+		Select("*").
 		Single().
 		Eq("id", authorID).
 		Execute(&result)
@@ -154,8 +218,8 @@ func (s *Server) getAuthor(c *fiber.Ctx) error {
 }
 
 func (s *Server) listBooks(c *fiber.Ctx) error {
-	var result map[string]interface{}
-	err := s.sb.DB.From("books").Select("*", "exact").Execute(&result)
+	var result []map[string]interface{}
+	err := s.sb.DB.From("books").Select("*").Execute(&result)
 	if err != nil {
 		log.Printf("Error querying books: %v", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{Message: err.Error()})
@@ -173,15 +237,16 @@ func (s *Server) listBooks(c *fiber.Ctx) error {
 }
 
 func (s *Server) listCourses(c *fiber.Ctx) error {
-	var result map[string]interface{}
-	err := s.sb.DB.From("courses").Select("*", "exact").Execute(&result)
+	var jsonResult json.RawMessage
+	err := s.sb.DB.From("courses").Select("*").Execute(&jsonResult)
 	if err != nil {
 		log.Printf("Error querying courses: %v", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{Message: err.Error()})
 	}
 
 	var courses []models.Course
-	if err := mapstructure.Decode(result, &courses); err != nil {
+	err = json.Unmarshal(jsonResult, &courses)
+	if err != nil {
 		log.Printf("Error unmarshaling courses: %v", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{Message: err.Error()})
 	}
@@ -195,7 +260,7 @@ func (s *Server) getCourse(c *fiber.Ctx) error {
 
 	var result map[string]interface{}
 	err := s.sb.DB.From("courses").
-		Select("*", "exact").
+		Select("*").
 		Single().
 		Eq("id", courseID).
 		Execute(&result)
@@ -220,7 +285,7 @@ func (s *Server) GetCourseWithDetails(c *fiber.Ctx) error {
 
 	var courseData map[string]interface{}
 	err := s.sb.DB.From("courses").
-		Select("*", "exact").
+		Select("*").
 		Single().
 		Eq("id", courseID).
 		Execute(&courseData)
@@ -245,7 +310,7 @@ func (s *Server) GetCourseWithDetails(c *fiber.Ctx) error {
 	facId := strconv.Itoa(course.FacilitatorID)
 	var facilitatorData map[string]interface{}
 	err2 := s.sb.DB.From("facilitators").
-		Select("*", "exact").
+		Select("*").
 		Single().
 		Eq("id", facId).
 		Execute(&facilitatorData)
@@ -265,7 +330,7 @@ func (s *Server) GetCourseWithDetails(c *fiber.Ctx) error {
 
 	var booksData []map[string]interface{}
 	err3 := s.sb.DB.From("course_books").
-		Select("book_id", "exact").
+		Select("book_id").
 		Eq("course_id", courseID).
 		Execute(&booksData)
 	if err3 != nil {
@@ -288,7 +353,7 @@ func (s *Server) GetCourseWithDetails(c *fiber.Ctx) error {
 
 		var result map[string]interface{}
 		err := s.Sb().DB.From("books").
-			Select("*", "exact").
+			Select("*").
 			Single().
 			Eq("id", bookID).
 			Execute(&result)
@@ -378,7 +443,7 @@ func (s *Server) getFacilitator(c *fiber.Ctx) error {
 
 	var result map[string]interface{}
 	err := s.sb.DB.From("facilitators").
-		Select("*", "exact").
+		Select("*").
 		Eq("id", facilitatorID).
 		Execute(&result)
 	if err != nil {

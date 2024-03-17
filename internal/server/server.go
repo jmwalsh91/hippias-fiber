@@ -81,6 +81,12 @@ func (s *Server) setupRoutes() {
 	s.App.Post("/login", s.login)
 	s.App.Post("/register", s.register)
 	s.App.Post("/logout", s.logout)
+	s.App.Get("/discussions", s.listDiscussions)
+	s.App.Get("/discussions/:id", s.getDiscussion)
+	s.App.Post("/discussions", s.createDiscussion)
+	s.App.Put("/discussions/:id", s.updateDiscussion)
+	s.App.Delete("/discussions/:id", s.deleteDiscussion)
+
 }
 
 func (s *Server) login(c *fiber.Ctx) error {
@@ -498,3 +504,114 @@ func (s *Server) deleteFacilitator(c *fiber.Ctx) error {
 	log.Printf("Deleted facilitator with ID: %s", facilitatorID)
 	return c.SendStatus(fiber.StatusNoContent)
 }
+
+// DISCUSSIONS
+func (s *Server) createDiscussion(c *fiber.Ctx) error {
+	var discussion models.Discussion
+	if err := c.BodyParser(&discussion); err != nil {
+		log.Printf("Error parsing discussion: %v", err)
+		return c.Status(fiber.StatusBadRequest).JSON(ErrorResponse{Message: err.Error()})
+	}
+
+	data, err := json.Marshal(discussion)
+	if err != nil {
+		log.Printf("Error marshaling discussion: %v", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{Message: err.Error()})
+	}
+
+	var jsonResult json.RawMessage
+	err = s.sb.DB.From("discussions").Insert(string(data)).Execute(&jsonResult)
+	if err != nil {
+		log.Printf("Error inserting discussion: %v", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{Message: err.Error()})
+	}
+
+	log.Printf("Created discussion: %+v", discussion)
+	return c.JSON(discussion)
+}
+
+func (s *Server) getDiscussion(c *fiber.Ctx) error {
+	discussionID := c.Params("id")
+
+	var jsonResult json.RawMessage
+	err := s.sb.DB.From("discussions").
+		Select("*").
+		Single().
+		Eq("id", discussionID).
+		Execute(&jsonResult)
+	if err != nil {
+		log.Printf("Error querying discussion: %v", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{Message: err.Error()})
+	}
+
+	var discussion models.Discussion
+	err = json.Unmarshal(jsonResult, &discussion)
+	if err != nil {
+		log.Printf("Error unmarshaling discussion: %v", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{Message: err.Error()})
+	}
+
+	log.Printf("Discussion: %+v", discussion)
+	return c.JSON(discussion)
+}
+
+func (s *Server) listDiscussions(c *fiber.Ctx) error {
+	var jsonResult json.RawMessage
+	err := s.sb.DB.From("discussions").Select("*").Execute(&jsonResult)
+	if err != nil {
+		log.Printf("Error querying discussions: %v", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{Message: err.Error()})
+	}
+
+	var discussions []models.Discussion
+	err = json.Unmarshal(jsonResult, &discussions)
+	if err != nil {
+		log.Printf("Error unmarshaling discussions: %v", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{Message: err.Error()})
+	}
+
+	log.Printf("Discussions: %+v", discussions)
+	return c.JSON(discussions)
+}
+
+func (s *Server) updateDiscussion(c *fiber.Ctx) error {
+	discussionID := c.Params("id")
+
+	var discussion models.Discussion
+	if err := c.BodyParser(&discussion); err != nil {
+		log.Printf("Error parsing discussion: %v", err)
+		return c.Status(fiber.StatusBadRequest).JSON(ErrorResponse{Message: err.Error()})
+	}
+
+	data, err := json.Marshal(discussion)
+	if err != nil {
+		log.Printf("Error marshaling discussion: %v", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{Message: err.Error()})
+	}
+
+	var jsonResult json.RawMessage
+	err = s.sb.DB.From("discussions").Update(string(data)).Eq("id", discussionID).Execute(&jsonResult)
+	if err != nil {
+		log.Printf("Error updating discussion: %v", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{Message: err.Error()})
+	}
+
+	log.Printf("Updated discussion: %+v", discussion)
+	return c.JSON(discussion)
+}
+
+func (s *Server) deleteDiscussion(c *fiber.Ctx) error {
+	discussionID := c.Params("id")
+
+	var jsonResult json.RawMessage
+	err := s.sb.DB.From("discussions").Delete().Eq("id", discussionID).Execute(&jsonResult)
+	if err != nil {
+		log.Printf("Error deleting discussion: %v", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{Message: err.Error()})
+	}
+
+	log.Printf("Deleted discussion with ID: %s", discussionID)
+	return c.SendStatus(fiber.StatusNoContent)
+}
+
+//Readings!

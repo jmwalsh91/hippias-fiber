@@ -2,7 +2,6 @@ package server
 
 import (
 	"encoding/json"
-	"fmt"
 	"hippias-fiber/internal/models"
 	_ "hippias-fiber/swagger"
 	"log"
@@ -11,24 +10,28 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
+	"github.com/gofiber/fiber/v2/middleware/session"
 	"github.com/gofiber/swagger"
-	"github.com/supabase-community/supabase-go"
+	"github.com/mitchellh/mapstructure"
+	supa "github.com/nedpals/supabase-go"
 )
 
 type Server struct {
 	*fiber.App
-	sb *supabase.Client
+	sb *supa.Client
 }
 
 func New() *Server {
 	API_KEY := os.Getenv("API_KEY")
 	API_URL := os.Getenv("API_URL")
-	client, err := supabase.NewClient(API_URL, API_KEY, nil)
-	if err != nil {
-		panic(err)
-	}
+	client := supa.CreateClient(API_URL, API_KEY)
 
 	app := fiber.New()
+	store := session.New()
+	app.Use(func(c *fiber.Ctx) error {
+		c.Locals("session", store)
+		return c.Next()
+	})
 	app.Use(cors.New(cors.Config{
 		AllowOrigins: "*",
 		AllowMethods: "GET",
@@ -44,7 +47,7 @@ func New() *Server {
 	return server
 }
 
-func (s *Server) Sb() *supabase.Client {
+func (s *Server) Sb() *supa.Client {
 	return s.sb
 }
 
@@ -64,48 +67,28 @@ func (s *Server) setupRoutes() {
 	s.App.Delete("/facilitators/:id", s.deleteFacilitator)
 }
 
-// getBook godoc
-// @Summary Get a book by ID
-// @Description Retrieves a book by its ID
-// @Tags books
-// @Accept json
-// @Produce json
-// @Param id path int true "Book ID"
-// @Success 200 {object} models.Book
-// @Failure 500 {object} ErrorResponse
-// @Router /book/{id} [get]
 func (s *Server) getBook(c *fiber.Ctx) error {
 	bookID := c.Params("id")
 
-	data, _, err := s.sb.From("books").
-		Select("*", "1", false).
-		Eq("id", bookID).
+	var result map[string]interface{}
+	err := s.sb.DB.From("books").
+		Select("*").
 		Single().
-		Execute()
+		Eq("id", bookID).
+		Execute(&result)
 
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{Message: err.Error()})
 	}
 
 	var book models.Book
-	if err := json.Unmarshal(data, &book); err != nil {
+	if err := mapstructure.Decode(result, &book); err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{Message: err.Error()})
 	}
 
 	return c.JSON(book)
 }
 
-// getBooksByAuthorID godoc
-// @Summary Get books by author ID
-// @Description Retrieves books by the author's ID
-// @Tags books
-// @Accept json
-// @Produce json
-// @Param id path int true "Author ID"
-// @Success 200 {array} models.Book
-// @Failure 400 {object} ErrorResponse
-// @Failure 500 {object} ErrorResponse
-// @Router /books/author/{id} [get]
 func (s *Server) getBooksByAuthorID(c *fiber.Ctx) error {
 	authorID := c.Params("id")
 	log.Printf("Author ID: %v", authorID)
@@ -114,16 +97,18 @@ func (s *Server) getBooksByAuthorID(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(ErrorResponse{Message: "Missing author ID"})
 	}
 
-	data, _, err := s.sb.From("books").
-		Select("*", "exact", false).
+	var result map[string]interface{}
+	err := s.sb.DB.From("books").
+		Select("*", "exact").
 		Eq("authorId", authorID).
-		Execute()
+		Execute(&result)
+
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{Message: err.Error()})
 	}
 
 	var books []models.Book
-	if err := json.Unmarshal(data, &books); err != nil {
+	if err := mapstructure.Decode(result, &books); err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{Message: err.Error()})
 	}
 	log.Printf("Books: %v", books)
@@ -131,79 +116,53 @@ func (s *Server) getBooksByAuthorID(c *fiber.Ctx) error {
 	return c.JSON(books)
 }
 
-// listAuthors godoc
-// @Summary List authors
-// @Description Retrieves a list of authors
-// @Tags authors
-// @Accept json
-// @Produce json
-// @Success 200 {array} models.Author
-// @Failure 500 {object} ErrorResponse
-// @Router /authors [get]
 func (s *Server) listAuthors(c *fiber.Ctx) error {
-	data, _, err := s.sb.From("authors").Select("*", "exact", false).Execute()
+	var results []map[string]interface{}
+	err := s.sb.DB.From("authors").Select("*", "exact").Execute(&results)
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{Message: err.Error()})
 	}
 
 	var authors []models.Author
-	if err := json.Unmarshal(data, &authors); err != nil {
+	if err := mapstructure.Decode(results, &authors); err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{Message: err.Error()})
 	}
 
 	return c.JSON(authors)
 }
 
-// getAuthor godoc
-// @Summary Get an author by ID
-// @Description Retrieves an author by their ID
-// @Tags authors
-// @Accept json
-// @Produce json
-// @Param id path int true "Author ID"
-// @Success 200 {object} models.Author
-// @Failure 500 {object} ErrorResponse
-// @Router /authors/{id} [get]
 func (s *Server) getAuthor(c *fiber.Ctx) error {
 	authorID := c.Params("id")
 	log.Printf("Author ID: %v", authorID)
-	data, _, err := s.sb.From("authors").
-		Select("*", "exact", false).
-		Eq("id", authorID).
+	var result map[string]interface{}
+	err := s.sb.DB.From("authors").
+		Select("*", "exact").
 		Single().
-		Execute()
+		Eq("id", authorID).
+		Execute(&result)
 
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{Message: err.Error()})
 	}
 
 	var author models.Author
-	if err := json.Unmarshal(data, &author); err != nil {
+	if err := mapstructure.Decode(result, &author); err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{Message: err.Error()})
 	}
 
 	return c.JSON(author)
 }
 
-// listBooks godoc
-// @Summary List books
-// @Description Retrieves a list of books
-// @Tags books
-// @Accept json
-// @Produce json
-// @Success 200 {array} models.Book
-// @Failure 500 {object} ErrorResponse
-// @Router /list [get]
 func (s *Server) listBooks(c *fiber.Ctx) error {
-	data, _, err := s.sb.From("books").Select("*", "exact", false).Execute()
-
+	var result map[string]interface{}
+	err := s.sb.DB.From("books").Select("*", "exact").Execute(&result)
 	if err != nil {
 		log.Printf("Error querying books: %v", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{Message: err.Error()})
 	}
 
 	var books []models.Book
-	if err := json.Unmarshal(data, &books); err != nil {
+	if err := mapstructure.Decode(result, &books); err != nil {
 		log.Printf("Error unmarshaling books: %v", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{Message: err.Error()})
 	}
@@ -213,24 +172,16 @@ func (s *Server) listBooks(c *fiber.Ctx) error {
 	return c.JSON(books)
 }
 
-// listCourses godoc
-// @Summary List courses
-// @Description Retrieves a list of courses
-// @Tags courses
-// @Accept json
-// @Produce json
-// @Success 200 {array} models.Course
-// @Failure 500 {object} ErrorResponse
-// @Router /courses [get]
 func (s *Server) listCourses(c *fiber.Ctx) error {
-	data, _, err := s.sb.From("courses").Select("*", "exact", false).Execute()
+	var result map[string]interface{}
+	err := s.sb.DB.From("courses").Select("*", "exact").Execute(&result)
 	if err != nil {
 		log.Printf("Error querying courses: %v", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{Message: err.Error()})
 	}
 
 	var courses []models.Course
-	if err := json.Unmarshal(data, &courses); err != nil {
+	if err := mapstructure.Decode(result, &courses); err != nil {
 		log.Printf("Error unmarshaling courses: %v", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{Message: err.Error()})
 	}
@@ -239,31 +190,22 @@ func (s *Server) listCourses(c *fiber.Ctx) error {
 	return c.JSON(courses)
 }
 
-// getCourse godoc
-// @Summary Get a course by ID
-// @Description Retrieves a course by its ID
-// @Tags courses
-// @Accept json
-// @Produce json
-// @Param id path int true "Course ID"
-// @Success 200 {object} models.Course
-// @Failure 500 {object} ErrorResponse
-// @Router /courses/{id} [get]
 func (s *Server) getCourse(c *fiber.Ctx) error {
 	courseID := c.Params("id")
 
-	data, _, err := s.Sb().From("courses").
-		Select("*", "exact", false).
-		Eq("id", courseID).
+	var result map[string]interface{}
+	err := s.sb.DB.From("courses").
+		Select("*", "exact").
 		Single().
-		Execute()
+		Eq("id", courseID).
+		Execute(&result)
 	if err != nil {
 		log.Printf("Error querying course: %v", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{Message: err.Error()})
 	}
 
 	var course models.Course
-	if err := json.Unmarshal(data, &course); err != nil {
+	if err := mapstructure.Decode(result, &course); err != nil {
 		log.Printf("Error unmarshaling course: %v", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{Message: err.Error()})
 	}
@@ -272,46 +214,28 @@ func (s *Server) getCourse(c *fiber.Ctx) error {
 	return c.JSON(course)
 }
 
-// GetCourseWithDetails godoc
-// @Summary Get course details with facilitator and books
-// @Description Retrieves the course details along with its associated facilitator and an array of books included in the course
-// @Tags courses
-// @Accept json
-// @Produce json
-// @Param id path int true "Course ID"
-// @Success 200 {object} GetCourseWithDetailsResponse
-// @Failure 500 {object} ErrorResponse
-// @Router /courses/details/{id} [get]
 func (s *Server) GetCourseWithDetails(c *fiber.Ctx) error {
 	courseID := c.Params("id")
 	log.Printf("GetCourseWithDetails: Processing request for course ID: %s", courseID)
 
-	courseData, _, err := s.Sb().From("courses").
-		Select("*", "exact", false).
-		Eq("id", courseID).
+	var courseData map[string]interface{}
+	err := s.sb.DB.From("courses").
+		Select("*", "exact").
 		Single().
-		Execute()
+		Eq("id", courseID).
+		Execute(&courseData)
 	if err != nil {
 		log.Printf("GetCourseWithDetails: Error querying course: %v", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{Message: err.Error()})
 	}
 
 	var course models.Course
-	if err := json.Unmarshal(courseData, &course); err != nil {
+	if err := mapstructure.Decode(courseData, &course); err != nil {
 		log.Printf("GetCourseWithDetails: Error unmarshaling course data: %v", err)
-		log.Printf("GetCourseWithDetails: Course data: %s", string(courseData))
+		log.Printf("GetCourseWithDetails: Course data: %s", courseData)
 		return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{Message: err.Error()})
 	}
 	log.Printf("GetCourseWithDetails: Fetched course: %+v", course)
-
-	if err != nil {
-		log.Printf("GetCourseWithDetails: Error parsing created_at: %v", err)
-		return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{Message: fmt.Sprintf("Error parsing created_at: %v", err)})
-	}
-	if err != nil {
-		log.Printf("GetCourseWithDetails: Error parsing updated_at: %v", err)
-		return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{Message: fmt.Sprintf("Error parsing updated_at: %v", err)})
-	}
 
 	if course.FacilitatorID == 0 {
 		log.Printf("GetCourseWithDetails: Invalid Facilitator ID for course ID: %s", courseID)
@@ -319,38 +243,40 @@ func (s *Server) GetCourseWithDetails(c *fiber.Ctx) error {
 	}
 
 	facId := strconv.Itoa(course.FacilitatorID)
-	facilitatorData, _, err := s.Sb().From("facilitators").
-		Select("*", "exact", false).
-		Eq("id", facId).
+	var facilitatorData map[string]interface{}
+	err2 := s.sb.DB.From("facilitators").
+		Select("*", "exact").
 		Single().
-		Execute()
-	if err != nil {
+		Eq("id", facId).
+		Execute(&facilitatorData)
+	if err2 != nil {
 		log.Printf("GetCourseWithDetails: Error querying facilitator: %v", err)
 		log.Printf("GetCourseWithDetails: Facilitator ID: %d", course.FacilitatorID)
 		return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{Message: err.Error()})
 	}
 
 	var facilitator models.Facilitator
-	if err := json.Unmarshal(facilitatorData, &facilitator); err != nil {
+	if err := mapstructure.Decode(facilitatorData, &facilitator); err != nil {
 		log.Printf("GetCourseWithDetails: Error unmarshaling facilitator data: %v", err)
-		log.Printf("GetCourseWithDetails: Facilitator data: %s", string(facilitatorData))
+		log.Printf("GetCourseWithDetails: Facilitator data: %s", facilitatorData)
 		return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{Message: err.Error()})
 	}
 	log.Printf("GetCourseWithDetails: Fetched facilitator: %+v", facilitator)
 
-	booksData, _, err := s.Sb().From("course_books").
-		Select("book_id", "exact", false).
+	var booksData []map[string]interface{}
+	err3 := s.sb.DB.From("course_books").
+		Select("book_id", "exact").
 		Eq("course_id", courseID).
-		Execute()
-	if err != nil {
+		Execute(&booksData)
+	if err3 != nil {
 		log.Printf("GetCourseWithDetails: Error querying course books: %v", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{Message: err.Error()})
 	}
 
 	var courseBooks []models.CourseBook
-	if err := json.Unmarshal(booksData, &courseBooks); err != nil {
+	if err := mapstructure.Decode(booksData, &courseBooks); err != nil {
 		log.Printf("GetCourseWithDetails: Error unmarshaling course books data: %v", err)
-		log.Printf("GetCourseWithDetails: Course books data: %s", string(booksData))
+		log.Printf("GetCourseWithDetails: Course books data: %s", booksData)
 		return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{Message: err.Error()})
 	}
 	log.Printf("GetCourseWithDetails: Fetched course books: %+v", courseBooks)
@@ -360,11 +286,12 @@ func (s *Server) GetCourseWithDetails(c *fiber.Ctx) error {
 		bookID := strconv.Itoa(courseBook.BookID)
 		log.Printf("GetCourseWithDetails: Processing book ID: %s", bookID)
 
-		bookData, _, err := s.Sb().From("books").
-			Select("*", "exact", false).
-			Eq("id", bookID).
+		var result map[string]interface{}
+		err := s.Sb().DB.From("books").
+			Select("*", "exact").
 			Single().
-			Execute()
+			Eq("id", bookID).
+			Execute(&result)
 		if err != nil {
 			log.Printf("GetCourseWithDetails: Error querying book: %v", err)
 			log.Printf("GetCourseWithDetails: Book ID: %s", bookID)
@@ -372,9 +299,9 @@ func (s *Server) GetCourseWithDetails(c *fiber.Ctx) error {
 		}
 
 		var book models.Book
-		if err := json.Unmarshal(bookData, &book); err != nil {
+		if err := mapstructure.Decode(result, &book); err != nil {
 			log.Printf("GetCourseWithDetails: Error unmarshaling book data: %v", err)
-			log.Printf("GetCourseWithDetails: Book data: %s", string(bookData))
+			log.Printf("GetCourseWithDetails: Book data: %s", result)
 			return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{Message: err.Error()})
 		}
 		log.Printf("GetCourseWithDetails: Fetched book: %+v", book)
@@ -402,17 +329,6 @@ type ErrorResponse struct {
 	Message string `json:"message"`
 }
 
-// createCourse godoc
-// @Summary Create a course
-// @Description Creates a new course
-// @Tags courses
-// @Accept json
-// @Produce json
-// @Param course body models.Course true "Course object"
-// @Success 200 {object} models.Course
-// @Failure 400 {object} ErrorResponse
-// @Failure 500 {object} ErrorResponse
-// @Router /courses [post]
 func (s *Server) createCourse(c *fiber.Ctx) error {
 	var course models.Course
 	if err := c.BodyParser(&course); err != nil {
@@ -426,7 +342,8 @@ func (s *Server) createCourse(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{Message: err.Error()})
 	}
 
-	data, _, err = s.sb.From("courses").Insert(string(data), false, "Error", "Success", "1").Execute()
+	var result map[string]interface{}
+	err = s.sb.DB.From("courses").Insert(string(data)).Execute(&result)
 	if err != nil {
 		log.Printf("Error inserting course: %v", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{Message: err.Error()})
@@ -436,53 +353,41 @@ func (s *Server) createCourse(c *fiber.Ctx) error {
 	return c.JSON(data)
 }
 
-// listFacilitators godoc
-// @Summary List facilitators
-// @Description Retrieves a list of facilitators
-// @Tags facilitators
-// @Accept json
-// @Produce json
-// @Success 200 {array} models.Facilitator
-// @Failure 500 {object} ErrorResponse
-// @Router /facilitators [get]
 func (s *Server) listFacilitators(c *fiber.Ctx) error {
-	data, _, err := s.sb.From("facilitators").Select("*", "exact", true).Execute()
+	var results []map[string]interface{}
+	err := s.sb.DB.From("facilitators").Select("*").Execute(&results)
 	if err != nil {
 		log.Printf("Error querying facilitators: %v", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{Message: err.Error()})
 	}
 
 	var facilitators []models.Facilitator
-	if err := json.Unmarshal(data, &facilitators); err != nil {
-		log.Printf("Error unmarshaling facilitators: %v", err)
-		return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{Message: err.Error()})
+	for _, result := range results {
+		var facilitator models.Facilitator
+		if err := mapstructure.Decode(result, &facilitator); err != nil {
+			return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{Message: err.Error()})
+		}
+		facilitators = append(facilitators, facilitator)
 	}
 
 	log.Printf("Facilitators: %+v", facilitators)
 	return c.JSON(facilitators)
 }
-
-// getFacilitator godoc
-// @Summary Get a facilitator by ID
-// @Description Retrieves a facilitator by their ID
-// @Tags facilitators
-// @Accept json
-// @Produce json
-// @Param id path int true "Facilitator ID"
-// @Success 200 {object} models.Facilitator
-// @Failure 500 {object} ErrorResponse
-// @Router /facilitators/{id} [get]
 func (s *Server) getFacilitator(c *fiber.Ctx) error {
 	facilitatorID := c.Params("id")
 
-	data, _, err := s.sb.From("facilitators").Select("*", "exact", true).Eq("id", facilitatorID).Execute()
+	var result map[string]interface{}
+	err := s.sb.DB.From("facilitators").
+		Select("*", "exact").
+		Eq("id", facilitatorID).
+		Execute(&result)
 	if err != nil {
 		log.Printf("Error querying facilitator: %v", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{Message: err.Error()})
 	}
 
 	var facilitator models.Facilitator
-	if err := json.Unmarshal(data, &facilitator); err != nil {
+	if err := mapstructure.Decode(result, &facilitator); err != nil {
 		log.Printf("Error unmarshaling facilitator: %v", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{Message: err.Error()})
 	}
@@ -491,17 +396,6 @@ func (s *Server) getFacilitator(c *fiber.Ctx) error {
 	return c.JSON(facilitator)
 }
 
-// createFacilitator godoc
-// @Summary Create a facilitator
-// @Description Creates a new facilitator
-// @Tags facilitators
-// @Accept json
-// @Produce json
-// @Param facilitator body models.Facilitator true "Facilitator object"
-// @Success 200 {object} models.Facilitator
-// @Failure 400 {object} ErrorResponse
-// @Failure 500 {object} ErrorResponse
-// @Router /facilitators [post]
 func (s *Server) createFacilitator(c *fiber.Ctx) error {
 	var facilitator models.Facilitator
 	if err := c.BodyParser(&facilitator); err != nil {
@@ -509,7 +403,8 @@ func (s *Server) createFacilitator(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(ErrorResponse{Message: err.Error()})
 	}
 
-	_, _, err := s.sb.From("facilitators").Insert(facilitator, false, "", "*", "").Execute()
+	var result map[string]interface{}
+	err := s.sb.DB.From("facilitators").Insert(facilitator).Execute(&result)
 	if err != nil {
 		log.Printf("Error inserting facilitator: %v", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{Message: err.Error()})
@@ -519,20 +414,11 @@ func (s *Server) createFacilitator(c *fiber.Ctx) error {
 	return c.JSON(facilitator)
 }
 
-// deleteFacilitator godoc
-// @Summary Delete a facilitator by ID
-// @Description Deletes a facilitator by their ID
-// @Tags facilitators
-// @Accept json
-// @Produce json
-// @Param id path int true "Facilitator ID"
-// @Success 204
-// @Failure 500 {object} ErrorResponse
-// @Router /facilitators/{id} [delete]
 func (s *Server) deleteFacilitator(c *fiber.Ctx) error {
 	facilitatorID := c.Params("id")
 
-	_, _, err := s.sb.From("facilitators").Delete("Success", "true").Eq("id", facilitatorID).Execute()
+	var result map[string]interface{}
+	err := s.sb.DB.From("facilitators").Delete().Eq("id", facilitatorID).Execute(&result)
 	if err != nil {
 		log.Printf("Error deleting facilitator: %v", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{Message: err.Error()})

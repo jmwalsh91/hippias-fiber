@@ -254,23 +254,23 @@ func (s *Server) listCourses(c *fiber.Ctx) error {
 	log.Printf("Courses: %+v", courses)
 	return c.JSON(courses)
 }
-
 func (s *Server) getCourse(c *fiber.Ctx) error {
 	courseID := c.Params("id")
 
-	var result map[string]interface{}
+	var jsonResult json.RawMessage
 	err := s.sb.DB.From("courses").
 		Select("*").
 		Single().
 		Eq("id", courseID).
-		Execute(&result)
+		Execute(&jsonResult)
 	if err != nil {
 		log.Printf("Error querying course: %v", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{Message: err.Error()})
 	}
 
 	var course models.Course
-	if err := mapstructure.Decode(result, &course); err != nil {
+	err = json.Unmarshal(jsonResult, &course)
+	if err != nil {
 		log.Printf("Error unmarshaling course: %v", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{Message: err.Error()})
 	}
@@ -283,21 +283,21 @@ func (s *Server) GetCourseWithDetails(c *fiber.Ctx) error {
 	courseID := c.Params("id")
 	log.Printf("GetCourseWithDetails: Processing request for course ID: %s", courseID)
 
-	var courseData map[string]interface{}
+	var jsonResult json.RawMessage
 	err := s.sb.DB.From("courses").
 		Select("*").
 		Single().
 		Eq("id", courseID).
-		Execute(&courseData)
+		Execute(&jsonResult)
 	if err != nil {
 		log.Printf("GetCourseWithDetails: Error querying course: %v", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{Message: err.Error()})
 	}
 
 	var course models.Course
-	if err := mapstructure.Decode(courseData, &course); err != nil {
+	err = json.Unmarshal(jsonResult, &course)
+	if err != nil {
 		log.Printf("GetCourseWithDetails: Error unmarshaling course data: %v", err)
-		log.Printf("GetCourseWithDetails: Course data: %s", courseData)
 		return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{Message: err.Error()})
 	}
 	log.Printf("GetCourseWithDetails: Fetched course: %+v", course)
@@ -308,12 +308,12 @@ func (s *Server) GetCourseWithDetails(c *fiber.Ctx) error {
 	}
 
 	facId := strconv.Itoa(course.FacilitatorID)
-	var facilitatorData map[string]interface{}
+	var jsonFacilitatorResult json.RawMessage
 	err2 := s.sb.DB.From("facilitators").
 		Select("*").
 		Single().
 		Eq("id", facId).
-		Execute(&facilitatorData)
+		Execute(&jsonFacilitatorResult)
 	if err2 != nil {
 		log.Printf("GetCourseWithDetails: Error querying facilitator: %v", err)
 		log.Printf("GetCourseWithDetails: Facilitator ID: %d", course.FacilitatorID)
@@ -321,27 +321,27 @@ func (s *Server) GetCourseWithDetails(c *fiber.Ctx) error {
 	}
 
 	var facilitator models.Facilitator
-	if err := mapstructure.Decode(facilitatorData, &facilitator); err != nil {
+	err = json.Unmarshal(jsonFacilitatorResult, &facilitator)
+	if err != nil {
 		log.Printf("GetCourseWithDetails: Error unmarshaling facilitator data: %v", err)
-		log.Printf("GetCourseWithDetails: Facilitator data: %s", facilitatorData)
 		return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{Message: err.Error()})
 	}
 	log.Printf("GetCourseWithDetails: Fetched facilitator: %+v", facilitator)
 
-	var booksData []map[string]interface{}
+	var jsonBooksResult json.RawMessage
 	err3 := s.sb.DB.From("course_books").
 		Select("book_id").
 		Eq("course_id", courseID).
-		Execute(&booksData)
+		Execute(&jsonBooksResult)
 	if err3 != nil {
 		log.Printf("GetCourseWithDetails: Error querying course books: %v", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{Message: err.Error()})
 	}
 
 	var courseBooks []models.CourseBook
-	if err := mapstructure.Decode(booksData, &courseBooks); err != nil {
+	err = json.Unmarshal(jsonBooksResult, &courseBooks)
+	if err != nil {
 		log.Printf("GetCourseWithDetails: Error unmarshaling course books data: %v", err)
-		log.Printf("GetCourseWithDetails: Course books data: %s", booksData)
 		return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{Message: err.Error()})
 	}
 	log.Printf("GetCourseWithDetails: Fetched course books: %+v", courseBooks)
@@ -351,12 +351,12 @@ func (s *Server) GetCourseWithDetails(c *fiber.Ctx) error {
 		bookID := strconv.Itoa(courseBook.BookID)
 		log.Printf("GetCourseWithDetails: Processing book ID: %s", bookID)
 
-		var result map[string]interface{}
+		var jsonBookResult json.RawMessage
 		err := s.Sb().DB.From("books").
 			Select("*").
 			Single().
 			Eq("id", bookID).
-			Execute(&result)
+			Execute(&jsonBookResult)
 		if err != nil {
 			log.Printf("GetCourseWithDetails: Error querying book: %v", err)
 			log.Printf("GetCourseWithDetails: Book ID: %s", bookID)
@@ -364,9 +364,9 @@ func (s *Server) GetCourseWithDetails(c *fiber.Ctx) error {
 		}
 
 		var book models.Book
-		if err := mapstructure.Decode(result, &book); err != nil {
+		err = json.Unmarshal(jsonBookResult, &book)
+		if err != nil {
 			log.Printf("GetCourseWithDetails: Error unmarshaling book data: %v", err)
-			log.Printf("GetCourseWithDetails: Book data: %s", result)
 			return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{Message: err.Error()})
 		}
 		log.Printf("GetCourseWithDetails: Fetched book: %+v", book)
@@ -407,8 +407,8 @@ func (s *Server) createCourse(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{Message: err.Error()})
 	}
 
-	var result map[string]interface{}
-	err = s.sb.DB.From("courses").Insert(string(data)).Execute(&result)
+	var jsonResult json.RawMessage
+	err = s.sb.DB.From("courses").Insert(string(data)).Execute(&jsonResult)
 	if err != nil {
 		log.Printf("Error inserting course: %v", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{Message: err.Error()})
@@ -419,40 +419,40 @@ func (s *Server) createCourse(c *fiber.Ctx) error {
 }
 
 func (s *Server) listFacilitators(c *fiber.Ctx) error {
-	var results []map[string]interface{}
-	err := s.sb.DB.From("facilitators").Select("*").Execute(&results)
+	var jsonResult json.RawMessage
+	err := s.sb.DB.From("facilitators").Select("*").Execute(&jsonResult)
 	if err != nil {
 		log.Printf("Error querying facilitators: %v", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{Message: err.Error()})
 	}
 
 	var facilitators []models.Facilitator
-	for _, result := range results {
-		var facilitator models.Facilitator
-		if err := mapstructure.Decode(result, &facilitator); err != nil {
-			return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{Message: err.Error()})
-		}
-		facilitators = append(facilitators, facilitator)
+	err = json.Unmarshal(jsonResult, &facilitators)
+	if err != nil {
+		log.Printf("Error unmarshaling facilitators: %v", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{Message: err.Error()})
 	}
 
 	log.Printf("Facilitators: %+v", facilitators)
 	return c.JSON(facilitators)
 }
+
 func (s *Server) getFacilitator(c *fiber.Ctx) error {
 	facilitatorID := c.Params("id")
 
-	var result map[string]interface{}
+	var jsonResult json.RawMessage
 	err := s.sb.DB.From("facilitators").
 		Select("*").
 		Eq("id", facilitatorID).
-		Execute(&result)
+		Execute(&jsonResult)
 	if err != nil {
 		log.Printf("Error querying facilitator: %v", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{Message: err.Error()})
 	}
 
 	var facilitator models.Facilitator
-	if err := mapstructure.Decode(result, &facilitator); err != nil {
+	err = json.Unmarshal(jsonResult, &facilitator)
+	if err != nil {
 		log.Printf("Error unmarshaling facilitator: %v", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{Message: err.Error()})
 	}
@@ -468,8 +468,14 @@ func (s *Server) createFacilitator(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusBadRequest).JSON(ErrorResponse{Message: err.Error()})
 	}
 
-	var result map[string]interface{}
-	err := s.sb.DB.From("facilitators").Insert(facilitator).Execute(&result)
+	data, err := json.Marshal(facilitator)
+	if err != nil {
+		log.Printf("Error marshaling facilitator: %v", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{Message: err.Error()})
+	}
+
+	var jsonResult json.RawMessage
+	err = s.sb.DB.From("facilitators").Insert(string(data)).Execute(&jsonResult)
 	if err != nil {
 		log.Printf("Error inserting facilitator: %v", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{Message: err.Error()})
@@ -482,8 +488,8 @@ func (s *Server) createFacilitator(c *fiber.Ctx) error {
 func (s *Server) deleteFacilitator(c *fiber.Ctx) error {
 	facilitatorID := c.Params("id")
 
-	var result map[string]interface{}
-	err := s.sb.DB.From("facilitators").Delete().Eq("id", facilitatorID).Execute(&result)
+	var jsonResult json.RawMessage
+	err := s.sb.DB.From("facilitators").Delete().Eq("id", facilitatorID).Execute(&jsonResult)
 	if err != nil {
 		log.Printf("Error deleting facilitator: %v", err)
 		return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{Message: err.Error()})

@@ -99,6 +99,7 @@ func (s *Server) setupRoutes() {
 	s.App.Post("/discussion-attendance", s.createDiscussionAttendance)
 	s.App.Get("/discussions/:id/attendance", s.listDiscussionAttendance)
 	s.App.Get("/courses/:id/management", s.getCourseManagementDetails)
+	s.App.Get("/discussions/:id/management", s.GetDiscussionMgmtDetails)
 }
 
 func (s *Server) login(c *fiber.Ctx) error {

@@ -1,0 +1,404 @@
+definitions:
+  models.Author:
+    properties:
+      createdAt:
+        type: string
+      description:
+        type: string
+      id:
+        type: integer
+      name:
+        type: string
+      nationality:
+        type: string
+      updatedAt:
+        type: string
+    type: object
+  models.Book:
+    properties:
+      author:
+        type: string
+      authorId:
+        type: integer
+      createdAt:
+        type: string
+      description:
+        type: string
+      id:
+        type: integer
+      title:
+        type: string
+      updatedAt:
+        type: string
+    type: object
+  models.Course:
+    properties:
+      createdAt:
+        type: string
+      description:
+        type: string
+      facilitatorId:
+        type: integer
+      id:
+        type: integer
+      title:
+        type: string
+      updatedAt:
+        type: string
+    type: object
+  models.Facilitator:
+    properties:
+      bio:
+        type: string
+      createdAt:
+        type: string
+      email:
+        type: string
+      id:
+        type: integer
+      name:
+        type: string
+      updatedAt:
+        type: string
+    type: object
+  server.ErrorResponse:
+    properties:
+      message:
+        type: string
+    type: object
+  server.GetCourseWithDetailsResponse:
+    properties:
+      books:
+        items:
+          $ref: '#/definitions/models.Book'
+        type: array
+      course:
+        $ref: '#/definitions/models.Course'
+      facilitator:
+        $ref: '#/definitions/models.Facilitator'
+    type: object
+info:
+  contact: {}
+paths:
+  /authors:
+    get:
+      consumes:
+      - application/json
+      description: Retrieves a list of authors
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.Author'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+      summary: List authors
+      tags:
+      - authors
+  /authors/{id}:
+    get:
+      consumes:
+      - application/json
+      description: Retrieves an author by their ID
+      parameters:
+      - description: Author ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Author'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+      summary: Get an author by ID
+      tags:
+      - authors
+  /book/{id}:
+    get:
+      consumes:
+      - application/json
+      description: Retrieves a book by its ID
+      parameters:
+      - description: Book ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Book'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+      summary: Get a book by ID
+      tags:
+      - books
+  /books/author/{id}:
+    get:
+      consumes:
+      - application/json
+      description: Retrieves books by the author's ID
+      parameters:
+      - description: Author ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.Book'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+      summary: Get books by author ID
+      tags:
+      - books
+  /courses:
+    get:
+      consumes:
+      - application/json
+      description: Retrieves a list of courses
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.Course'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+      summary: List courses
+      tags:
+      - courses
+    post:
+      consumes:
+      - application/json
+      description: Creates a new course
+      parameters:
+      - description: Course object
+        in: body
+        name: course
+        required: true
+        schema:
+          $ref: '#/definitions/models.Course'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Course'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+      summary: Create a course
+      tags:
+      - courses
+  /courses/{id}:
+    get:
+      consumes:
+      - application/json
+      description: Retrieves a course by its ID
+      parameters:
+      - description: Course ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Course'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+      summary: Get a course by ID
+      tags:
+      - courses
+  /courses/details/{id}:
+    get:
+      consumes:
+      - application/json
+      description: Retrieves the course details along with its associated facilitator
+        and an array of books included in the course
+      parameters:
+      - description: Course ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/server.GetCourseWithDetailsResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+      summary: Get course details with facilitator and books
+      tags:
+      - courses
+  /facilitators:
+    get:
+      consumes:
+      - application/json
+      description: Retrieves a list of facilitators
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.Facilitator'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+      summary: List facilitators
+      tags:
+      - facilitators
+    post:
+      consumes:
+      - application/json
+      description: Creates a new facilitator
+      parameters:
+      - description: Facilitator object
+        in: body
+        name: facilitator
+        required: true
+        schema:
+          $ref: '#/definitions/models.Facilitator'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Facilitator'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+      summary: Create a facilitator
+      tags:
+      - facilitators
+  /facilitators/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Deletes a facilitator by their ID
+      parameters:
+      - description: Facilitator ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+      summary: Delete a facilitator by ID
+      tags:
+      - facilitators
+    get:
+      consumes:
+      - application/json
+      description: Retrieves a facilitator by their ID
+      parameters:
+      - description: Facilitator ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.Facilitator'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+      summary: Get a facilitator by ID
+      tags:
+      - facilitators
+  /list:
+    get:
+      consumes:
+      - application/json
+      description: Retrieves a list of books
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/models.Book'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/server.ErrorResponse'
+      summary: List books
+      tags:
+      - books
+swagger: "2.0"

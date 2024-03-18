@@ -39,4 +39,15 @@ watch:
 	    fi; \
 	fi
 
-.PHONY: all build run test clean
+# Generate Swagger Documentation
+swagger:
+	@echo "Generating Swagger Documentation..."
+	    cd cmd/api && swag init -g main.go -o ../../swagger/docs
+
+# Generate Swagger Documentation 2
+swag:
+	@echo "Generating Swagger Documentation..."
+	    swag init -g internal/server/server.go -o ./swagger
+		    mv ./swagger/swagger.json ./swagger/doc.json
+
+.PHONY: all build run test clean swagger swagger2

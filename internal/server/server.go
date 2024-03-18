@@ -86,11 +86,19 @@ func (s *Server) setupRoutes() {
 	s.App.Post("/discussions", s.createDiscussion)
 	s.App.Put("/discussions/:id", s.updateDiscussion)
 	s.App.Delete("/discussions/:id", s.deleteDiscussion)
+	s.App.Post("/reading-ratings", s.createReadingRating)
+	s.App.Get("/reading-ratings/:id", s.getReadingRating)
+	s.App.Get("/readings/:id/ratings", s.listReadingRatings)
+	s.App.Put("/reading-ratings/:id", s.updateReadingRating)
+	s.App.Delete("/reading-ratings/:id", s.deleteReadingRating)
 	s.App.Get("/readings", s.listReadings)
 	s.App.Get("/readings/:id", s.getReading)
 	s.App.Post("/readings", s.createReading)
 	s.App.Put("/readings/:id", s.updateReading)
 	s.App.Delete("/readings/:id", s.deleteReading)
+	s.App.Post("/discussion-attendance", s.createDiscussionAttendance)
+	s.App.Get("/discussions/:id/attendance", s.listDiscussionAttendance)
+	s.App.Get("/courses/:id/management", s.getCourseManagementDetails)
 }
 
 func (s *Server) login(c *fiber.Ctx) error {
@@ -728,4 +736,167 @@ func (s *Server) deleteReading(c *fiber.Ctx) error {
 	return c.SendStatus(fiber.StatusNoContent)
 }
 
-//
+//Discussion Attendance
+
+func (s *Server) createDiscussionAttendance(c *fiber.Ctx) error {
+	var attendance models.DiscussionAttendance
+	if err := c.BodyParser(&attendance); err != nil {
+		log.Printf("Error parsing discussion attendance: %v", err)
+		return c.Status(fiber.StatusBadRequest).JSON(ErrorResponse{Message: err.Error()})
+	}
+
+	data, err := json.Marshal(attendance)
+	if err != nil {
+		log.Printf("Error marshaling discussion attendance: %v", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{Message: err.Error()})
+	}
+
+	var jsonResult json.RawMessage
+	err = s.sb.DB.From("discussion_attendance").Insert(string(data)).Execute(&jsonResult)
+	if err != nil {
+		log.Printf("Error inserting discussion attendance: %v", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{Message: err.Error()})
+	}
+
+	log.Printf("Created discussion attendance: %+v", attendance)
+	return c.JSON(attendance)
+}
+
+func (s *Server) listDiscussionAttendance(c *fiber.Ctx) error {
+	discussionID := c.Params("id")
+
+	var jsonResult json.RawMessage
+	err := s.sb.DB.From("discussion_attendance").
+		Select("*").
+		Eq("discussion_id", discussionID).
+		Execute(&jsonResult)
+	if err != nil {
+		log.Printf("Error querying discussion attendance: %v", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{Message: err.Error()})
+	}
+
+	var attendanceList []models.DiscussionAttendance
+	err = json.Unmarshal(jsonResult, &attendanceList)
+	if err != nil {
+		log.Printf("Error unmarshaling discussion attendance: %v", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{Message: err.Error()})
+	}
+
+	log.Printf("Discussion attendance: %+v", attendanceList)
+	return c.JSON(attendanceList)
+}
+
+// ReadingRating
+
+func (s *Server) getReadingRating(c *fiber.Ctx) error {
+	ratingID := c.Params("id")
+
+	var jsonResult json.RawMessage
+	err := s.sb.DB.From("reading_ratings").
+		Select("*").
+		Single().
+		Eq("id", ratingID).
+		Execute(&jsonResult)
+	if err != nil {
+		log.Printf("Error querying reading rating: %v", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{Message: err.Error()})
+	}
+
+	var rating models.ReadingRating
+	err = json.Unmarshal(jsonResult, &rating)
+	if err != nil {
+		log.Printf("Error unmarshaling reading rating: %v", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{Message: err.Error()})
+	}
+
+	log.Printf("Reading rating: %+v", rating)
+	return c.JSON(rating)
+}
+
+func (s *Server) listReadingRatings(c *fiber.Ctx) error {
+	readingID := c.Params("id")
+
+	var jsonResult json.RawMessage
+	err := s.sb.DB.From("reading_ratings").
+		Select("*").
+		Eq("reading_id", readingID).
+		Execute(&jsonResult)
+	if err != nil {
+		log.Printf("Error querying reading ratings: %v", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{Message: err.Error()})
+	}
+
+	var ratings []models.ReadingRating
+	err = json.Unmarshal(jsonResult, &ratings)
+	if err != nil {
+		log.Printf("Error unmarshaling reading ratings: %v", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{Message: err.Error()})
+	}
+
+	log.Printf("Reading ratings: %+v", ratings)
+	return c.JSON(ratings)
+}
+
+func (s *Server) createReadingRating(c *fiber.Ctx) error {
+	var rating models.ReadingRating
+	if err := c.BodyParser(&rating); err != nil {
+		log.Printf("Error parsing reading rating: %v", err)
+		return c.Status(fiber.StatusBadRequest).JSON(ErrorResponse{Message: err.Error()})
+	}
+
+	data, err := json.Marshal(rating)
+	if err != nil {
+		log.Printf("Error marshaling reading rating: %v", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{Message: err.Error()})
+	}
+
+	var jsonResult json.RawMessage
+	err = s.sb.DB.From("reading_ratings").Insert(string(data)).Execute(&jsonResult)
+	if err != nil {
+		log.Printf("Error inserting reading rating: %v", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{Message: err.Error()})
+	}
+
+	log.Printf("Created reading rating: %+v", rating)
+	return c.JSON(rating)
+}
+
+func (s *Server) updateReadingRating(c *fiber.Ctx) error {
+	ratingID := c.Params("id")
+
+	var rating models.ReadingRating
+	if err := c.BodyParser(&rating); err != nil {
+		log.Printf("Error parsing reading rating: %v", err)
+		return c.Status(fiber.StatusBadRequest).JSON(ErrorResponse{Message: err.Error()})
+	}
+
+	data, err := json.Marshal(rating)
+	if err != nil {
+		log.Printf("Error marshaling reading rating: %v", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{Message: err.Error()})
+	}
+
+	var jsonResult json.RawMessage
+	err = s.sb.DB.From("reading_ratings").Update(string(data)).Eq("id", ratingID).Execute(&jsonResult)
+	if err != nil {
+		log.Printf("Error updating reading rating: %v", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{Message: err.Error()})
+	}
+
+	log.Printf("Updated reading rating: %+v", rating)
+	return c.JSON(rating)
+}
+
+func (s *Server) deleteReadingRating(c *fiber.Ctx) error {
+	ratingID := c.Params("id")
+
+	var jsonResult json.RawMessage
+	err := s.sb.DB.From("reading_ratings").Delete().Eq("id", ratingID).Execute(&jsonResult)
+	if err != nil {
+		log.Printf("Error deleting reading rating: %v", err)
+		return c.Status(fiber.StatusInternalServerError).JSON(ErrorResponse{Message: err.Error()})
+	}
+
+	log.Printf("Deleted reading rating with ID: %s", ratingID)
+	return c.SendStatus(fiber.StatusNoContent)
+}
